@@ -41,7 +41,7 @@ int count;
 ITEM *buffer[ITEMSIZE];
 
 pthread_mutex_t mutex;
-sem_t *full, *empty;
+sem_t full, empty;
 
 void produce(int ssock) {
 
@@ -49,7 +49,6 @@ void produce(int ssock) {
 
 	// Wait for room in the buffer
 	// while ( count > BUFSIZE );
-	sem_wait( empty );
     
     if ( write( ssock, GO, 5 ) < 0 ) {
             /* This guy is dead */
@@ -75,6 +74,7 @@ void produce(int ssock) {
     }
 
     ITEM *p = makeItem(size, buf);
+	sem_wait( &empty );
 
 	pthread_mutex_lock( &mutex );
 	// Put the item in the next slot in the buffer
@@ -83,7 +83,7 @@ void produce(int ssock) {
 	printf( "C Count %d.\n", count );
 	pthread_mutex_unlock( &mutex );
 
-	sem_post( full );
+	sem_post( &full );
 
     if ( write( ssock, DONE, 7 ) < 0 ) {
             /* This guy is dead */
@@ -101,7 +101,7 @@ void consume(int ssock) {
 
 	// Wait for items in the buffer
 	// while ( count <= 0 );
-	sem_wait( full );
+	sem_wait( &full );
 
 	pthread_mutex_lock( &mutex );
 	// Remove the item and update the buffer
@@ -111,7 +111,7 @@ void consume(int ssock) {
 	printf( "C Count %d.\n", count );
 	pthread_mutex_unlock( &mutex );
 
-	sem_post( empty );
+	sem_post(&empty );
 
 	// Now use it
 	int len = htonl(p->size);
@@ -121,7 +121,8 @@ void consume(int ssock) {
 		fprintf( stderr, "client write: %s\n", strerror(errno) );
 		exit( -1 );
 	}
-
+	printf("Consuming size %d\n", p->size);
+	fflush(stdout);
 	if ( write( ssock, p->product, p->size) < 0 ) {
         /* This guy is dead */
         close( ssock );
@@ -175,8 +176,8 @@ int main( int argc, char *argv[] )
 	int			rport = 0;
 
     pthread_mutex_init( &mutex, NULL );
-	sem_open( "/full", O_CREAT, 0644, 0 );
-	sem_open( "/empty", O_CREAT, 0644, ITEMSIZE );
+	sem_init( &full, 0, 0 );
+	sem_init( &empty, 0, ITEMSIZE );
 
     count = 0;
 
