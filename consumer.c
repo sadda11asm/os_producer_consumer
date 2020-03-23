@@ -11,7 +11,6 @@
 #include <pthread.h>
 
 
-#define CONSUMERS_COUNT 10
 
 int connectsock( char *host, char *service, char *protocol );
 char* CONSUME = "CONSUME\r\n";
@@ -93,16 +92,18 @@ void *consume(void *tid) {
 int
 main( int argc, char *argv[] )
 {
-	
+	int CONSUMERS_COUNT = 10;
 	switch( argc ) 
 	{
-		case    2:
-			service = argv[1];
-			break;
+
 		case    3:
+			service = argv[1];
+			CONSUMERS_COUNT = atoi(argv[2]);
+			break;
+		case	4:
 			host = argv[1];
 			service = argv[2];
-			break;
+			CONSUMERS_COUNT = atoi(argv[3]);
 		default:
 			fprintf( stderr, "usage: chat [host] port\n" );
 			exit(-1);

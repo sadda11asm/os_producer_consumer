@@ -12,7 +12,7 @@
 
 
 #define	QLEN			5
-#define	ITEMSIZE		100
+int	ITEMSIZE	=	100;
 char* PRODUCE = "PRODUCE\r\n";
 char* CRLF = "\r\n";
 char* GO = "GO\r\n";
@@ -38,7 +38,7 @@ ITEM *makeItem(int size, char* buf){
 }
 
 int count;
-ITEM *buffer[ITEMSIZE];
+ITEM **buffer;
 
 pthread_mutex_t mutex;
 sem_t full, empty;
@@ -189,6 +189,7 @@ int main( int argc, char *argv[] )
 	int			ssock;
 	int			rport = 0;
 
+
     pthread_mutex_init( &mutex, NULL );
 	sem_init( &full, 0, 0 );
 	sem_init( &empty, 0, ITEMSIZE );
@@ -203,13 +204,19 @@ int main( int argc, char *argv[] )
 			rport = 1;
 			break;
 		case	2:
+			ITEMSIZE = atoi(argv[1]);
+			break;
+		case	3:
 			// User provides a port? then use it
 			service = argv[1];
+			ITEMSIZE = atoi(argv[2]);
 			break;
 		default:
 			fprintf( stderr, "usage: server [port]\n" );
 			exit(-1);
 	}
+
+	buffer = malloc(ITEMSIZE * sizeof(ITEM*));
 
 	msock = passivesock( service, "tcp", QLEN, &rport );
 	if (rport)

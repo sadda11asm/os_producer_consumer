@@ -10,7 +10,7 @@
 #include <pthread.h>
 
 
-#define PRODUCERS_COUNT 10
+
 
 int connectsock( char *host, char *service, char *protocol );
 char* PRODUCE = "PRODUCE\r\n";
@@ -72,7 +72,7 @@ void *produce() {
 		close(csock);
 		exit(-1);
 	}
-	printf("Success!");
+	printf("Success!\n");
         close( csock );
     } else {
         printf("Unexpected action: %s", buf);
@@ -88,16 +88,17 @@ void *produce() {
 int
 main( int argc, char *argv[] )
 {
-	
+	int PRODUCERS_COUNT=10;
 	switch( argc ) 
 	{
-		case    2:
-			service = argv[1];
-			break;
 		case    3:
+			service = argv[1];
+			PRODUCERS_COUNT = atoi(argv[2]);
+			break;
+		case	4:
 			host = argv[1];
 			service = argv[2];
-			break;
+			PRODUCERS_COUNT = atoi(argv[3]);
 		default:
 			fprintf( stderr, "usage: chat [host] port\n" );
 			exit(-1);
