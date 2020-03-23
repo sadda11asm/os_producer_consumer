@@ -68,12 +68,12 @@ void *consume(void *tid) {
         exit(-1);
     }*/
 
-    printf("Consuming: %s", buf);
-    fflush( stdout );
+    //printf("Consuming: %s", buf);
+    //fflush( stdout );
     char* name = malloc(10*sizeof(char));
     sprintf(name, "%d.txt", id);
-    printf("NAME: %s\n", name);
-    fflush( stdout );
+    //printf("NAME: %s\n", name);
+    //fflush( stdout );
     int fd = open(name, O_RDWR | O_CREAT, 0777);
 	if (fd == -1) {
 		printf("Error Number % d\n", errno);  

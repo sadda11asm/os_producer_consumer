@@ -13,6 +13,12 @@
 
 #define	QLEN			5
 int	ITEMSIZE	=	100;
+int 	CON_COUNT 	= 	0;
+int	PROD_COUNT	=	0;
+int	CONS_COUNT	=	0;
+int 	CON_MAX 	= 	512;
+int	CON_PROD_MAX	=	480;
+int 	CON_CONS_MAX	=	480;
 char* PRODUCE = "PRODUCE\r\n";
 char* CRLF = "\r\n";
 char* GO = "GO\r\n";
@@ -41,7 +47,21 @@ int count;
 ITEM **buffer;
 
 pthread_mutex_t mutex;
+pthread_mutex_t mutex_conns;
 sem_t full, empty;
+
+void close_socket(int ssock, int con_type) {
+	close(ssock);	
+	pthread_mutex_lock( &mutex_conns );	
+	if (con_type == 1) {
+		PROD_COUNT--;
+	} else if (con_type == 0) {
+		CONS_COUNT--;
+	}
+	CON_COUNT--;
+	pthread_mutex_unlock( &mutex_conns );
+	pthread_exit( NULL );
+}
 
 void produce(int ssock) {
 
@@ -53,14 +73,14 @@ void produce(int ssock) {
     if ( write( ssock, GO, 5 ) < 0 ) {
             /* This guy is dead */
 			printf( "The producer has gone when should get GO.\n" );
-            close( ssock );
+            close_socket( ssock, 1 );
             return;
     } 
 
     if ( read( ssock, &size, sizeof(size)) <= 0 )
     {
         printf( "The producer has gone when should pass size of item.\n" );
-        close(ssock);
+        close_socket(ssock, 1);
         return;
     } 
 	size = ntohl(size);
@@ -84,8 +104,8 @@ void produce(int ssock) {
    
 
     ITEM *p = makeItem(size, buf);
-printf("Producing buf %s\n", p->product);
-    fflush(stdout);
+    //printf("Producing buf %s\n", p->product);
+    //fflush(stdout);
     printf("Producing size %d\n", p->size);
     fflush(stdout);
 	sem_wait( &empty );
@@ -102,12 +122,11 @@ printf("Producing buf %s\n", p->product);
     if ( write( ssock, DONE, 7 ) < 0 ) {
             /* This guy is dead */
 			printf( "The producer has gone when should get DONE.\n" );
-            close( ssock );
+            close_socket( ssock, 1 );
             exit(-1);
     } 
 	// Exit
-	close(ssock);
-	pthread_exit( NULL );
+	close_socket(ssock, 1);
 }
 
 void consume(int ssock) {
@@ -134,18 +153,17 @@ void consume(int ssock) {
 		fprintf( stderr, "client write: %s\n", strerror(errno) );
 		exit( -1 );
 	}
-	printf("Consuming buf %s\n", p.product);
-	fflush(stdout);
+	//printf("Consuming buf %s\n", p.product);
+	//fflush(stdout);
 	printf("Consuming size %d\n", p.size);
 	fflush(stdout);
 	if ( write( ssock, p.product, p.size) < 0 ) {
 		/* This guy is dead */
-		close( ssock );
+		close_socket( ssock, 0 );
 		exit(-1);
 	} 
-	close(ssock);
+	close_socket(ssock, 0);
 	// Exit
-	pthread_exit( NULL );
 }
 
 
@@ -160,19 +178,50 @@ void *handle( void *s ) {
     if ( (cc = read( ssock, buf, 10)) <= 0 )
     {
         printf( "The client has gone.\n" );
-        close(ssock);
+        close_socket(ssock, 10);
         exit(-1);
     } 
 
     if (strcmp(buf, PRODUCE) == 0) {
-        printf("Producer is here!\n");
-        produce(ssock);
+	
+	int ok = 1;
+	
+    	pthread_mutex_lock( &mutex_conns );
+	
+    	if (PROD_COUNT < CON_PROD_MAX) {
+		PROD_COUNT++;
+	} else {
+		ok = 0;
+		close_socket(ssock, 10);
+		printf("TOO MANY PRODUCERS! LIMIT IS REACHED!\n");
+	}
+	pthread_mutex_unlock( &mutex_conns );
+	if (ok) {
+		printf("Producer is here!\n");
+        	produce(ssock);
+	}	
+
     } else if (strcmp(buf, CONSUME) == 0) {
-        consume(ssock);
-        printf("Consumer is here!\n");
+
+	pthread_mutex_lock( &mutex_conns );
+	int ok = 1;
+	if (CONS_COUNT < CON_CONS_MAX) {
+		CONS_COUNT++;
+	} else {
+		ok = 0;
+		close_socket(ssock, 10);
+		printf("TOO MANY CONSUMERS! LIMIT IS REACHED!\n");
+	}
+	
+	pthread_mutex_unlock( &mutex_conns );
+	if (ok) {
+		consume(ssock);
+        	printf("Consumer is here!\n");	
+	}        
+	
     } else {
         printf("Unexpected action: %s\n", buf);
-		close(ssock);
+	close_socket(ssock, 10);
     }
 	pthread_exit(0);
 }
@@ -188,11 +237,8 @@ int main( int argc, char *argv[] )
 	int			msock;
 	int			ssock;
 	int			rport = 0;
-
-
     pthread_mutex_init( &mutex, NULL );
-	sem_init( &full, 0, 0 );
-	sem_init( &empty, 0, ITEMSIZE );
+    pthread_mutex_init( &mutex_conns, NULL);
 
     count = 0;
 
@@ -215,6 +261,9 @@ int main( int argc, char *argv[] )
 			fprintf( stderr, "usage: server [port]\n" );
 			exit(-1);
 	}
+
+	sem_init( &full, 0, 0 );
+	sem_init( &empty, 0, ITEMSIZE );
 
 	buffer = malloc(ITEMSIZE * sizeof(ITEM*));
 
@@ -239,12 +288,20 @@ int main( int argc, char *argv[] )
 			fprintf( stderr, "accept: %s\n", strerror(errno) );
 			break;
 		}
-
-		printf( "A client has arrived.\n" );
-		fflush( stdout );
-
-		pthread_create( &thr, NULL, handle, (void *) ssock );
-
+		
+		pthread_mutex_lock( &mutex_conns );
+		
+		if (CON_COUNT < CON_MAX) {
+		
+			printf( "A client has arrived.\n" );
+			fflush( stdout );
+			CON_COUNT++;
+			pthread_create( &thr, NULL, handle, (void *) ssock );
+		} else {
+			close(ssock);
+			printf("TOO MUCH CONNECTIONS! LIMIT IS REACHED!");			
+		}
+		pthread_mutex_unlock( &mutex_conns );
 	}
 	pthread_exit(0);
 }
