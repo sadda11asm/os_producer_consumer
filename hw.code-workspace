@@ -1,0 +1,26 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.tcc": "c",
+			"fstream": "c",
+			"functional": "c",
+			"streambuf": "c",
+			"__cxx_version": "c",
+			"__mutex_base": "c",
+			"condition_variable": "c",
+			"future": "c",
+			"mutex": "c",
+			"shared_mutex": "c",
+			"thread": "c",
+			"version": "c",
+			"atomic": "c",
+			"locale": "c",
+			"istream": "c"
+		}
+	}
+}
