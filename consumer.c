@@ -52,14 +52,22 @@ void *consume(void *tid) {
     size = ntohl(size);
     printf("SIZE %d\n", size);
     fflush( stdout );
-    char buf[size];
+    char *buf = malloc((size + 1)*sizeof(char));
 
-    if ( read( csock, buf, size) <= 0 )
+    int load = 1;
+    int cursor = 0;
+    while (load!=0) {
+	if (cursor >= size) break;
+	load = read(csock, (void *) (buf + cursor), size - cursor);
+	cursor+=load;
+    }
+
+    /*if ( read( csock, buf, size) <= 0 )
     {
         printf( "The server has gone when should pass buffer of item.\n" );
         close(csock);
         exit(-1);
-    }
+    }*/
 
     printf("Consuming: %s", buf);
     fflush( stdout );

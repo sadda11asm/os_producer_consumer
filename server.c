@@ -30,7 +30,7 @@ ITEM *makeItem(int size, char* buf){
 	int i;
 	ITEM *p = malloc( sizeof(ITEM) );
 	p->size = size;
-	p->product = malloc(p->size);	
+	p->product = malloc(p->size * sizeof(char));	
 	for ( i = 0; i < p->size-1; i++ )
 		p->product[i] = buf[i];
 	p->product[i] = '\0';
@@ -64,16 +64,30 @@ void produce(int ssock) {
         return;
     } 
 	size = ntohl(size);
-    char buf[size];
+    char* buf = malloc((size + 1)*sizeof(char));
 
-    if ( read( ssock, buf, size) <= 0 )
+    int load = 1;
+    int cursor = 0;
+    while (load!=0) {
+	if (cursor >= size) break;
+	load = read(ssock, (void *) (buf + cursor), size - cursor);
+	cursor+=load;
+    }
+
+    /*if ( read( ssock, buf, size) <= 0 )
     {
         printf( "The producer has gone when should pass buffer of item.\n" );
         close(ssock);
         return;
-    }
+    }*/
+
+   
 
     ITEM *p = makeItem(size, buf);
+printf("Producing buf %s\n", p->product);
+    fflush(stdout);
+    printf("Producing size %d\n", p->size);
+    fflush(stdout);
 	sem_wait( &empty );
 
 	pthread_mutex_lock( &mutex );
@@ -92,8 +106,7 @@ void produce(int ssock) {
             exit(-1);
     } 
 	// Exit
-	free(p->product);
-	free(p);
+	close(ssock);
 	pthread_exit( NULL );
 }
 
@@ -101,11 +114,11 @@ void consume(int ssock) {
 
 	// Wait for items in the buffer
 	// while ( count <= 0 );
+	ITEM p;
 	sem_wait( &full );
-
 	pthread_mutex_lock( &mutex );
 	// Remove the item and update the buffer
-	ITEM *p = buffer[count-1];
+	p = *(buffer[count-1]);
 	buffer[count-1] = NULL;
 	count--;
 	printf( "C Count %d.\n", count );
@@ -114,22 +127,23 @@ void consume(int ssock) {
 	sem_post(&empty );
 
 	// Now use it
-	int len = htonl(p->size);
+	int len = htonl(p.size);
 	char *data = (char*)&len;
 	
 	if ( write(ssock, data , sizeof(len)) < 0 ) {
 		fprintf( stderr, "client write: %s\n", strerror(errno) );
 		exit( -1 );
 	}
-	printf("Consuming size %d\n", p->size);
+	printf("Consuming buf %s\n", p.product);
 	fflush(stdout);
-	if ( write( ssock, p->product, p->size) < 0 ) {
-        /* This guy is dead */
-        close( ssock );
-        exit(-1);
-    } 
-
-
+	printf("Consuming size %d\n", p.size);
+	fflush(stdout);
+	if ( write( ssock, p.product, p.size) < 0 ) {
+		/* This guy is dead */
+		close( ssock );
+		exit(-1);
+	} 
+	close(ssock);
 	// Exit
 	pthread_exit( NULL );
 }

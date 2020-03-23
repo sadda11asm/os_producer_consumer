@@ -66,6 +66,13 @@ void *produce() {
             fprintf( stderr, "server write: %s\n", strerror(errno) );
             exit( -1 );
 	    }
+	char done[10];
+	if ( read( csock, buf, 7) <= 0 ) {
+		printf( "The server has gone.\n" );
+		close(csock);
+		exit(-1);
+	}
+	printf("Success!");
         close( csock );
     } else {
         printf("Unexpected action: %s", buf);
