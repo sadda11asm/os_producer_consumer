@@ -8,21 +8,21 @@ COMPILE         = gcc ${COMPILE_FLAGS}
 LINK            = gcc -o
 
 C_SRCS		= \
-		producers.c \
-		consumers.c \
 		passivesock.c \
 		connectsock.c \
-		prodcon_server.c
+		producer.c \
+		consumer.c \
+		server.c
 
 SOURCE          = ${C_SRCS}
 
 OBJS            = ${SOURCE:.c=.o}
 
-EXEC		= producers consumers pcserver
+EXEC		= producer consumer server
 
 .SUFFIXES       :       .o .c .h
 
-all		:	library producers consumers pcserver
+all		:	library producer consumer server
 
 .c.o            :	${SOURCE}
 			@echo "    Compiling $< . . .  "
@@ -31,14 +31,14 @@ all		:	library producers consumers pcserver
 library		:	passivesock.o connectsock.o
 			ar rv libsocklib.a passivesock.o connectsock.o
 
-pcserver	:	prodcon_server.o
-			${LINK} $@ prodcon_server.o ${LIBS}
+server	:	server.o
+			${LINK} $@ server.o ${LIBS}
 
-producers	:	producers.o
-			${LINK} $@ producers.o ${LIBS}
+producer		:	producer.o
+			${LINK} $@ producer.o ${LIBS}
 
-consumers	:	consumers.o
-			${LINK} $@ consumers.o ${LIBS}
+consumer		:	consumer.o
+			${LINK} $@ consumer.o ${LIBS}
 
 clean           :
 			@echo "    Cleaning ..."

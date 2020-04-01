@@ -9,7 +9,7 @@
 #include <netinet/in.h>
 #include <fcntl.h> 
 #include <pthread.h>
-
+#include "prodcon.h"
 
 
 int connectsock( char *host, char *service, char *protocol );

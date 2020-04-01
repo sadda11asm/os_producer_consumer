@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include "prodcon.h"
 
 
 
@@ -22,7 +23,7 @@ char		*service;
 char		*host = "localhost";
 
 char* getRandomString() {
-    int size = random()%80;
+    int size = random()%MAX_LETTERS;
 	char* str = malloc(size);	
 	int i;
 	for ( i = 0; i < size-1; i++ )

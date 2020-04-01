@@ -9,37 +9,31 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include "prodcon.h"
 
 
-#define	QLEN			5
-int	ITEMSIZE	=	100;
 int 	CON_COUNT 	= 	0;
 int	PROD_COUNT	=	0;
 int	CONS_COUNT	=	0;
-int 	CON_MAX 	= 	512;
-int	CON_PROD_MAX	=	480;
-int 	CON_CONS_MAX	=	480;
 char* PRODUCE = "PRODUCE\r\n";
 char* CRLF = "\r\n";
 char* GO = "GO\r\n";
 char* CONSUME = "CONSUME\r\n";
 char* DONE = "DONE\r\n";
+int ITEMSIZE = BUFSIZE;
 
 int passivesock( char *service, char *protocol, int qlen, int *rport );
-
-typedef struct item_t{
-	char *product;
-	int size;
-} ITEM;
 
 ITEM *makeItem(int size, char* buf){
 	int i;
 	ITEM *p = malloc( sizeof(ITEM) );
 	p->size = size;
-	p->product = malloc(p->size * sizeof(char));	
+	p->letters = malloc(p->size * sizeof(char));	
 	for ( i = 0; i < p->size-1; i++ )
-		p->product[i] = buf[i];
-	p->product[i] = '\0';
+		p->letters[i] = buf[i];
+	p->letters[i] = '\0';
 	return p;
 }
 
@@ -104,7 +98,7 @@ void produce(int ssock) {
    
 
     ITEM *p = makeItem(size, buf);
-    //printf("Producing buf %s\n", p->product);
+    //printf("Producing buf %s\n", p->letters);
     //fflush(stdout);
     printf("Producing size %d\n", p->size);
     fflush(stdout);
@@ -153,11 +147,11 @@ void consume(int ssock) {
 		fprintf( stderr, "client write: %s\n", strerror(errno) );
 		exit( -1 );
 	}
-	//printf("Consuming buf %s\n", p.product);
+	//printf("Consuming buf %s\n", p.letters);
 	//fflush(stdout);
 	printf("Consuming size %d\n", p.size);
 	fflush(stdout);
-	if ( write( ssock, p.product, p.size) < 0 ) {
+	if ( write( ssock, p.letters, p.size) < 0 ) {
 		/* This guy is dead */
 		close_socket( ssock, 0 );
 		exit(-1);
@@ -188,7 +182,7 @@ void *handle( void *s ) {
 	
     	pthread_mutex_lock( &mutex_conns );
 	
-    	if (PROD_COUNT < CON_PROD_MAX) {
+    	if (PROD_COUNT < MAX_PROD) {
 		PROD_COUNT++;
 	} else {
 		ok = 0;
@@ -205,7 +199,7 @@ void *handle( void *s ) {
 
 	pthread_mutex_lock( &mutex_conns );
 	int ok = 1;
-	if (CONS_COUNT < CON_CONS_MAX) {
+	if (CONS_COUNT < MAX_CON) {
 		CONS_COUNT++;
 	} else {
 		ok = 0;
@@ -291,7 +285,7 @@ int main( int argc, char *argv[] )
 		
 		pthread_mutex_lock( &mutex_conns );
 		
-		if (CON_COUNT < CON_MAX) {
+		if (CON_COUNT < MAX_CLIENTS) {
 		
 			printf( "A client has arrived.\n" );
 			fflush( stdout );
