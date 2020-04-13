@@ -12,7 +12,7 @@ C_SRCS		= \
 		consumers.c \
 		passivesock.c \
 		connectsock.c \
-		prodcon_server.c
+		multiplexing_server.c
 
 SOURCE          = ${C_SRCS}
 
@@ -31,7 +31,7 @@ all		:	library producers consumers pcserver
 library		:	passivesock.o connectsock.o
 			ar rv libsocklib.a passivesock.o connectsock.o
 
-pcserver	:	prodcon_server.o
+pcserver	:	multiplexing_server.o
 			${LINK} $@ prodcon_server.o ${LIBS}
 
 producers	:	producers.o
