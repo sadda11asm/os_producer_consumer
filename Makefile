@@ -18,11 +18,11 @@ SOURCE          = ${C_SRCS}
 
 OBJS            = ${SOURCE:.c=.o}
 
-EXEC		= producers consumers pcserver
+EXEC		= producers consumers mpserver
 
 .SUFFIXES       :       .o .c .h
 
-all		:	library producers consumers pcserver
+all		:	library producers consumers mpserver
 
 .c.o            :	${SOURCE}
 			@echo "    Compiling $< . . .  "
@@ -31,8 +31,8 @@ all		:	library producers consumers pcserver
 library		:	passivesock.o connectsock.o
 			ar rv libsocklib.a passivesock.o connectsock.o
 
-pcserver	:	multiplexing_server.o
-			${LINK} $@ prodcon_server.o ${LIBS}
+mpserver	:	multiplexing_server.o
+			${LINK} $@ multiplexing_server.o ${LIBS}
 
 producers	:	producers.o
 			${LINK} $@ producers.o ${LIBS}

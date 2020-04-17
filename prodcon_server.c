@@ -215,7 +215,7 @@ void *handle( void *s ) {
 	
     } else {
         printf("Unexpected action: %s\n", buf);
-	close_socket(ssock, 10);
+		close_socket(ssock, 10);	
     }
 	pthread_exit(0);
 }

@@ -56,9 +56,6 @@ void close_socket(int ssock, int con_type) {
 	}
 	CON_COUNT--;
 	(void) close(ssock);		
-	FD_CLR( ssock, &afds );
-	if ( nfds == ssock+1 )
-		nfds--;
 	pthread_mutex_unlock( &mutex_conns );
 	pthread_exit( NULL );
 }
@@ -127,6 +124,7 @@ void *produce(void *ssock) {
     } 
 	// Exit
 	close_socket(ssock, 1);
+	pthread_exit(0);
 }
 
 void *consume(void *ssock) {
@@ -165,6 +163,7 @@ void *consume(void *ssock) {
 	} 
 	close_socket(ssock, 0);
 	// Exit
+	pthread_exit(0);
 }
 
 
@@ -178,10 +177,7 @@ void handle( int ssock, pthread_t	thr ) {
     if ( (cc = read( ssock, buf, 10)) <= 0 )
     {
         printf( "The client has gone.\n" );
-		(void) close(ssock);		
-		FD_CLR( ssock, &afds );
-		if ( nfds == ssock+1 )
-			nfds--;
+		close_socket(ssock, 10);
         exit(-1);
     } 
 
@@ -224,10 +220,7 @@ void handle( int ssock, pthread_t	thr ) {
 	
     } else {
         printf("Unexpected action: %s\n", buf);
-		(void) close(ssock);		
-		FD_CLR( ssock, &afds );
-		if ( nfds == ssock+1 )
-			nfds--;
+		close_socket(ssock, 10);	
         exit(-1);
     }
 }
@@ -333,28 +326,32 @@ int main( int argc, char *argv[] ) {
 			if (fd != msock && FD_ISSET(fd, &rfds))
 			{
 
-				pthread_mutex_lock( &mutex_conns );
+				int ok = 0;
+				FD_CLR( fd, &afds );
+				if ( nfds == fd+1 )
+					nfds--;
 				
+				pthread_mutex_lock( &mutex_conns );
 				if (CON_COUNT < MAX_CLIENTS) {
 				
 					printf( "A client has arrived.\n" );
 					fflush( stdout );
 					CON_COUNT++;
-					handle(ssock, thr);
+					ok = 1;
 					// pthread_create( &thr, NULL, handle, (void *) ssock );
 				
 					// you can read without blocking because data is there
-					// the OS has confirmed this
-					
+					// the OS has confirmed this					
+				} 
+				pthread_mutex_unlock( &mutex_conns );
+
+				if (ok == 1) {
+					handle(fd, thr);
 				} else {
-					(void) close(ssock);		
-					FD_CLR( ssock, &afds );
-					if ( nfds == ssock+1 )
-						nfds--;
+					(void) close(fd);		
 					printf("TOO MANY CONNECTIONS! LIMIT IS REACHED!");		
 					fflush( stdout );	
 				}
-				pthread_mutex_unlock( &mutex_conns );
 			}
 
 		}
