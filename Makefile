@@ -12,17 +12,17 @@ C_SRCS		= \
 		consumers.c \
 		passivesock.c \
 		connectsock.c \
-		multiplexing_server.c
+		prodcon_server.c
 
 SOURCE          = ${C_SRCS}
 
 OBJS            = ${SOURCE:.c=.o}
 
-EXEC		= producers consumers mpserver
+EXEC		= producers consumers pcserver
 
 .SUFFIXES       :       .o .c .h
 
-all		:	library producers consumers mpserver
+all		:	library producers consumers pcserver
 
 .c.o            :	${SOURCE}
 			@echo "    Compiling $< . . .  "
@@ -31,8 +31,8 @@ all		:	library producers consumers mpserver
 library		:	passivesock.o connectsock.o
 			ar rv libsocklib.a passivesock.o connectsock.o
 
-mpserver	:	multiplexing_server.o
-			${LINK} $@ multiplexing_server.o ${LIBS}
+pcserver	:	prodcon_server.o
+			${LINK} $@ prodcon_server.o ${LIBS}
 
 producers	:	producers.o
 			${LINK} $@ producers.o ${LIBS}

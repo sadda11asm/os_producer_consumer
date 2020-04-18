@@ -15,25 +15,22 @@
 
 
 int 	CON_COUNT 	= 	0;
-int	PROD_COUNT	=	0;
-int	CONS_COUNT	=	0;
-char* PRODUCE = "PRODUCE\r\n";
-char* CRLF = "\r\n";
-char* GO = "GO\r\n";
-char* CONSUME = "CONSUME\r\n";
-char* DONE = "DONE\r\n";
-int ITEMSIZE = BUFSIZE;
+int		PROD_COUNT	=	0;
+int		CONS_COUNT	=	0;
+char*	PRODUCE = "PRODUCE\r\n";
+char* 	CRLF = "\r\n";
+char* 	GO = "GO\r\n";
+char* 	CONSUME = "CONSUME\r\n";
+char*	DONE = "DONE\r\n";
+int 	ITEMSIZE = BUFSIZE;
 
 int passivesock( char *service, char *protocol, int qlen, int *rport );
 
-ITEM *makeItem(int size, char* buf){
+ITEM *makeItem(int size, int ssock){
 	int i;
 	ITEM *p = malloc( sizeof(ITEM) );
 	p->size = size;
-	p->letters = malloc(p->size * sizeof(char));	
-	for ( i = 0; i < p->size-1; i++ )
-		p->letters[i] = buf[i];
-	p->letters[i] = '\0';
+	p->prod_sd = ssock;	
 	return p;
 }
 
@@ -54,7 +51,7 @@ void close_socket(int ssock, int con_type) {
 	}
 	CON_COUNT--;
 	pthread_mutex_unlock( &mutex_conns );
-	pthread_exit( NULL );
+	if (con_type != 1) pthread_exit( NULL );
 }
 
 void produce(int ssock) {
@@ -78,32 +75,15 @@ void produce(int ssock) {
         return;
     } 
 	size = ntohl(size);
-    char* buf = malloc((size + 1)*sizeof(char));
+    
+	
 
-    int load = 1;
-    int cursor = 0;
-    while (load!=0) {
-	if (cursor >= size) break;
-	load = read(ssock, (void *) (buf + cursor), size - cursor);
-	cursor+=load;
-    }
-
-    /*if ( read( ssock, buf, size) <= 0 )
-    {
-        printf( "The producer has gone when should pass buffer of item.\n" );
-        close(ssock);
-        return;
-    }*/
-
-   
-
-    ITEM *p = makeItem(size, buf);
+	ITEM *p = makeItem(size, ssock);
     //printf("Producing buf %s\n", p->letters);
     //fflush(stdout);
     printf("Producing size %d\n", p->size);
     fflush(stdout);
 	sem_wait( &empty );
-
 	pthread_mutex_lock( &mutex );
 	// Put the item in the next slot in the buffer
 	buffer[count] = p;
@@ -113,14 +93,9 @@ void produce(int ssock) {
 
 	sem_post( &full );
 
-    if ( write( ssock, DONE, 7 ) < 0 ) {
-            /* This guy is dead */
-			printf( "The producer has gone when should get DONE.\n" );
-            close_socket( ssock, 1 );
-            exit(-1);
-    } 
+	pthread_exit(0);
 	// Exit
-	close_socket(ssock, 1);
+	// close_socket(ssock, 1);
 }
 
 void consume(int ssock) {
@@ -139,23 +114,50 @@ void consume(int ssock) {
 
 	sem_post(&empty );
 
-	// Now use it
+	
+	int size = p.size;
+	int psock = p.prod_sd;
+
+	//reading from psock
+	char* buf = malloc((size + 1)*sizeof(char));
+
+    int load = 1;
+    int cursor = 0;
+
+    while (load!=0) {
+		if (cursor >= size) break;
+		load = read(psock, (void *) (buf + cursor), size - cursor);
+		cursor+=load;
+    }
+	buf[size] = '\0';
+	
 	int len = htonl(p.size);
 	char *data = (char*)&len;
-	
+
+	//sending size to consumer
 	if ( write(ssock, data , sizeof(len)) < 0 ) {
 		fprintf( stderr, "client write: %s\n", strerror(errno) );
 		exit( -1 );
 	}
+
 	//printf("Consuming buf %s\n", p.letters);
 	//fflush(stdout);
 	printf("Consuming size %d\n", p.size);
 	fflush(stdout);
-	if ( write( ssock, p.letters, p.size) < 0 ) {
+	if ( write( ssock, buf, p.size) < 0 ) {
 		/* This guy is dead */
 		close_socket( ssock, 0 );
 		exit(-1);
 	} 
+	
+    if ( write( psock, DONE, 7 ) < 0 ) {
+            // This guy is dead
+			printf( "The producer has gone when should get DONE.\n" );
+            close_socket( psock, 1 );
+            exit(-1);
+    } 
+	
+	close_socket(psock, 1);
 	close_socket(ssock, 0);
 	// Exit
 }

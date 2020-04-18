@@ -139,8 +139,7 @@ int main( int argc, char *argv[] )
 	}
 	int count = 0;
 
-	for (int i = 0; i < PRODUCERS_COUNT; i++)
-	{
+	for (int i = 0; i < PRODUCERS_COUNT; i++) {
         pthread_t	thr;
 		double waiting_time = poissonRandomInterarrivalDelay(rate);
 		usleep(waiting_time*1000000);
@@ -159,7 +158,7 @@ int main( int argc, char *argv[] )
 
 
 	}
-	sleep(10);
+	// sleep(10);
 	// printf("CHECK BAD %d\n", count);
 	pthread_exit(0);
 
