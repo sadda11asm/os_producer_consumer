@@ -30,8 +30,26 @@ double poissonRandomInterarrivalDelay( double r )
 			((double) rand())/((double) RAND_MAX)))/-r;
 }
 
-void *consume(void *tid) {
-    int id = (int) tid;
+
+void slow_down() {
+	sleep(SLOW_CLIENT);
+}
+
+struct args {
+    int tid;
+    int is_bad;
+};
+
+
+void *consume(void *bundle) {
+    
+    int id = ((struct args*)bundle)->tid;
+    int is_bad = ((struct args*)bundle)->is_bad;
+
+    if (is_bad == 1) {
+        slow_down();
+    }
+
 	int	csock;
 	/*	Create the socket to the controller  */
 	if ( ( csock = connectsock( host, service, "tcp" )) == 0 )
@@ -121,15 +139,39 @@ main( int argc, char *argv[] )
 			exit(-1);
 	}
 
+    int number = (int) (bad*1.0*CONSUMERS_COUNT/100.0);
+	int dif = CONSUMERS_COUNT/(number+1); 
+	if (dif == 0) {
+		dif = 1;
+	}
+	int count = 0;
 
 	for (int i = 0; i < CONSUMERS_COUNT; i++)
 	{
         pthread_t	thr;
         double waiting_time = poissonRandomInterarrivalDelay(rate);
         usleep(waiting_time*1000000);
-		pthread_create( &thr, NULL, consume, (void *) i);
+
+        int is_bad = 0;
+		
+		if (i!=0 && i%dif == 0) is_bad = 1;
+		if (i == 0 && number == CONSUMERS_COUNT) is_bad = 1;
+		if (count == number) is_bad = 0;
+
+		if (is_bad == 1) {
+			count++;
+		}
+
+        struct args *bundle = (struct args *)malloc(sizeof(struct args));
+        bundle->tid = i;
+        bundle->is_bad = is_bad;
+		
+        pthread_create( &thr, NULL, consume, (void *) bundle);
 
 	}
+
+    sleep(10);
+	// printf("CHECK BAD %d\n", count);
 	pthread_exit(0);
 
 }

@@ -40,7 +40,18 @@ double poissonRandomInterarrivalDelay( double r ) {
 			((double) rand())/((double) RAND_MAX)))/-r;
 }
 
-void *produce() {
+void slow_down() {
+	sleep(SLOW_CLIENT);
+}
+
+void *produce(void *is_b) {
+
+	int is_bad = (int) is_b;
+
+	if (is_bad == 1) {
+		slow_down();
+	}
+
 	int		csock;
 	/*	Create the socket to the controller  */
 	if ( ( csock = connectsock( host, service, "tcp" )) == 0 )
@@ -121,15 +132,35 @@ int main( int argc, char *argv[] )
 	// printf("%f\n", wt);
 	// return 0;
 
+	int number = (int) (bad*1.0*PRODUCERS_COUNT/100.0);
+	int dif = PRODUCERS_COUNT/(number+1); 
+	if (dif == 0) {
+		dif = 1;
+	}
+	int count = 0;
+
 	for (int i = 0; i < PRODUCERS_COUNT; i++)
 	{
         pthread_t	thr;
 		double waiting_time = poissonRandomInterarrivalDelay(rate);
 		usleep(waiting_time*1000000);
 		// printf(waiting_time);
-		pthread_create( &thr, NULL, produce, NULL);
+		int is_bad = 0;
+		
+		if (i!=0 && i%dif == 0) is_bad = 1;
+		if (i == 0 && number == PRODUCERS_COUNT) is_bad = 1;
+		if (count == number) is_bad = 0;
+
+		if (is_bad == 1) {
+			count++;
+		}
+
+		pthread_create( &thr, NULL, produce, (void *) is_bad);
+
 
 	}
+	sleep(10);
+	// printf("CHECK BAD %d\n", count);
 	pthread_exit(0);
 
 }
