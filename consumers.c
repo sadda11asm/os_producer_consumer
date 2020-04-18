@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <fcntl.h> 
 #include <pthread.h>
+#include <math.h>
 #include "prodcon.h"
 
 
@@ -20,7 +21,14 @@ char* DONE = "DONE\r\n";
 
 char		*service;		
 char		*host = "localhost";
+double      rate = 0;
+int         bad = 0;
 
+double poissonRandomInterarrivalDelay( double r )
+{
+    return (log((double) 1.0 - 
+			((double) rand())/((double) RAND_MAX)))/-r;
+}
 
 void *consume(void *tid) {
     int id = (int) tid;
@@ -96,16 +104,20 @@ main( int argc, char *argv[] )
 	switch( argc ) 
 	{
 
-		case    3:
+		case    5:
 			service = argv[1];
 			CONSUMERS_COUNT = atoi(argv[2]);
+            rate = atof(argv[3]);
+            bad = atoi(argv[4]);
 			break;
-		case	4:
+		case	6:
 			host = argv[1];
 			service = argv[2];
 			CONSUMERS_COUNT = atoi(argv[3]);
+            rate = atof(argv[4]);
+            bad = atoi(argv[5]);
 		default:
-			fprintf( stderr, "usage: chat [host] port\n" );
+			fprintf( stderr, "usage: chat [host] port rate bad_num\n" );
 			exit(-1);
 	}
 
@@ -113,6 +125,8 @@ main( int argc, char *argv[] )
 	for (int i = 0; i < CONSUMERS_COUNT; i++)
 	{
         pthread_t	thr;
+        double waiting_time = poissonRandomInterarrivalDelay(rate);
+        usleep(waiting_time*1000000);
 		pthread_create( &thr, NULL, consume, (void *) i);
 
 	}

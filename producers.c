@@ -8,16 +8,19 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <math.h>
 #include "prodcon.h"
 
 
 
 
 int connectsock( char *host, char *service, char *protocol );
-char* PRODUCE = "PRODUCE\r\n";
-char* CRLF = "\r\n";
-char* GO = "GO\r\n";
-char* DONE = "DONE\r\n";
+char* 	PRODUCE = "PRODUCE\r\n";
+char* 	CRLF = "\r\n";
+char* 	GO = "GO\r\n";
+char* 	DONE = "DONE\r\n";
+double 	rate = 0;
+int 	bad = 0;
 
 char		*service;		
 char		*host = "localhost";
@@ -30,6 +33,11 @@ char* getRandomString() {
 		str[i] = 'X';
 	str[i] = '\0';
     return str;
+}
+
+double poissonRandomInterarrivalDelay( double r ) {
+    return (log((double) 1.0 - 
+			((double) rand())/((double) RAND_MAX)))/-r;
 }
 
 void *produce() {
@@ -86,29 +94,39 @@ void *produce() {
 /*
 **	Client
 */
-int
-main( int argc, char *argv[] )
+int main( int argc, char *argv[] )
 {
 	int PRODUCERS_COUNT=10;
 	switch( argc ) 
 	{
-		case    3:
+		case    5:
 			service = argv[1];
 			PRODUCERS_COUNT = atoi(argv[2]);
+			rate = atof(argv[3]);
+			bad = atoi(argv[4]);
 			break;
-		case	4:
+		case	6:
 			host = argv[1];
 			service = argv[2];
 			PRODUCERS_COUNT = atoi(argv[3]);
+			rate = atof(argv[4]);
+			bad = atoi(argv[5]);
 		default:
-			fprintf( stderr, "usage: chat [host] port\n" );
+			fprintf( stderr, "usage: chat [host] port num rate bad_num\n" );
 			exit(-1);
 	}
 
+	// printf("%f\n", rate);
+	// double wt = poissonRandomInterarrivalDelay(rate);
+	// printf("%f\n", wt);
+	// return 0;
 
 	for (int i = 0; i < PRODUCERS_COUNT; i++)
 	{
         pthread_t	thr;
+		double waiting_time = poissonRandomInterarrivalDelay(rate);
+		usleep(waiting_time*1000000);
+		// printf(waiting_time);
 		pthread_create( &thr, NULL, produce, NULL);
 
 	}

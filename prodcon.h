@@ -9,6 +9,7 @@
 #define MAX_CON     	480
 
 #define MAX_LETTERS 1000000
+#define SLOW_CLIENT 3
 
 int connectsock( char *host, char *service, char *protocol );
 int passivesock( char *service, char *protocol, int qlen, int *rport );

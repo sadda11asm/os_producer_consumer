@@ -55,12 +55,13 @@ void close_socket(int ssock, int con_type) {
 		CONS_COUNT--;
 	}
 	CON_COUNT--;
-	(void) close(ssock);		
 	pthread_mutex_unlock( &mutex_conns );
-	pthread_exit( NULL );
+	pthread_exit( 0 );
 }
 
-void *produce(void *ssock) {
+void *produce(void *ssck) {
+
+	int ssock = (int) ssck;
 
     int size = 10;
 
@@ -124,10 +125,11 @@ void *produce(void *ssock) {
     } 
 	// Exit
 	close_socket(ssock, 1);
-	pthread_exit(0);
 }
 
-void *consume(void *ssock) {
+void *consume(void *ssck) {
+	
+	int ssock = (int) ssck;
 
 	// Wait for items in the buffer
 	// while ( count <= 0 );
@@ -163,7 +165,6 @@ void *consume(void *ssock) {
 	} 
 	close_socket(ssock, 0);
 	// Exit
-	pthread_exit(0);
 }
 
 
@@ -191,14 +192,15 @@ void handle( int ssock, pthread_t	thr ) {
 			PROD_COUNT++;
 		} else {
 			ok = 0;
-			close_socket(ssock, 10);
-			printf("TOO MANY PRODUCERS! LIMIT IS REACHED!\n");
 		}
 		pthread_mutex_unlock( &mutex_conns );
 		if (ok) {
 			printf("Producer is here!\n");
 			pthread_create( &thr, NULL, produce, (void *) ssock );
-		}	
+		} else {
+			close_socket(ssock, 10);
+			printf("TOO MANY PRODUCERS! LIMIT IS REACHED!\n");
+		}
 
     } else if (strcmp(buf, CONSUME) == 0) {
 
@@ -208,14 +210,15 @@ void handle( int ssock, pthread_t	thr ) {
 			CONS_COUNT++;
 		} else {
 			ok = 0;
-			close_socket(ssock, 10);
-			printf("TOO MANY CONSUMERS! LIMIT IS REACHED!\n");
 		}
 		
 		pthread_mutex_unlock( &mutex_conns );
 		if (ok) {
 			printf("Consumer is here!\n");
 			pthread_create( &thr, NULL, consume, (void *) ssock );
+		} else {
+			close_socket(ssock, 10);
+			printf("TOO MANY CONSUMERS! LIMIT IS REACHED!\n");
 		}        
 	
     } else {
