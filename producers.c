@@ -63,16 +63,17 @@ void *produce(void *is_b) {
 	printf( "The server is ready for producer!\n" );
 	fflush( stdout );
 
-    if ( write(csock, PRODUCE , 10) < 0 ) {
+    if ( write(csock, PRODUCE , 9) < 0 ) {
         fprintf( stderr, "Producer write: %s\n", strerror(errno) );
         exit( -1 );
 	}
     char buf[5];
-    if ( read( csock, buf, 5) <= 0 ) {
+    if ( read( csock, buf, 4) <= 0 ) {
         printf( "The server has gone.\n" );
         close(csock);
         exit(-1);
     }
+	buf[4]='\0';
     if (strcmp(buf, GO) == 0) {
         char* item = getRandomString();
         int len = htonl(strlen(item));
@@ -86,12 +87,13 @@ void *produce(void *is_b) {
             fprintf( stderr, "server write: %s\n", strerror(errno) );
             exit( -1 );
 	    }
-	char done[10];
-	if ( read( csock, buf, 7) <= 0 ) {
+	char done[7];
+	if ( read( csock, done, 6) <= 0 ) {
 		printf( "The server has gone.\n" );
 		close(csock);
 		exit(-1);
 	}
+	done[6] = '\0';
 	printf("Success!\n");
         close( csock );
     } else {

@@ -61,7 +61,7 @@ void *consume(void *bundle) {
 	printf( "The server is ready for consumer!\n" );
 	fflush( stdout );
 
-    if ( write(csock, CONSUME , 10) < 0 ) {
+    if ( write(csock, CONSUME , 9) < 0 ) {
         printf( "The server has gone when getting CONSUME\n" );
         fprintf( stderr, "Consumer write: %s\n", strerror(errno) );
         exit( -1 );
@@ -82,9 +82,9 @@ void *consume(void *bundle) {
     int load = 1;
     int cursor = 0;
     while (load!=0) {
-	if (cursor >= size) break;
-	load = read(csock, (void *) (buf + cursor), size - cursor);
-	cursor+=load;
+        if (cursor >= size) break;
+        load = read(csock, (void *) (buf + cursor), size - cursor);
+        cursor+=load;
     }
 
     /*if ( read( csock, buf, size) <= 0 )

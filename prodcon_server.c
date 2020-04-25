@@ -61,7 +61,7 @@ void produce(int ssock) {
 	// Wait for room in the buffer
 	// while ( count > BUFSIZE );
     
-    if ( write( ssock, GO, 5 ) < 0 ) {
+    if ( write( ssock, GO, 4 ) < 0 ) {
             /* This guy is dead */
 			printf( "The producer has gone when should get GO.\n" );
             close_socket( ssock, 1 );
@@ -150,7 +150,7 @@ void consume(int ssock) {
 		exit(-1);
 	} 
 	
-    if ( write( psock, DONE, 7 ) < 0 ) {
+    if ( write( psock, DONE, 6 ) < 0 ) {
             // This guy is dead
 			printf( "The producer has gone when should get DONE.\n" );
             close_socket( psock, 1 );
@@ -171,16 +171,16 @@ void *handle( void *s ) {
 	/* start working for this guy */
 	/* ECHO what the client says */
 
-    if ( (cc = read( ssock, buf, 10)) <= 0 )
+    if ( (cc = read( ssock, buf, 9)) <= 0 )
     {
         printf( "The client has gone.\n" );
         close_socket(ssock, 10);
         exit(-1);
     } 
-
+	buf[9]='\0';
     if (strcmp(buf, PRODUCE) == 0) {
 	
-	int ok = 1;
+		int ok = 1;
 	
     	pthread_mutex_lock( &mutex_conns );
 	
