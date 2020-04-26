@@ -67,26 +67,62 @@ void *consume(void *bundle) {
         exit( -1 );
 	}
 
+    char* name = malloc(10*sizeof(char));
+    sprintf(name, "%d.txt", id);
+    //printf("NAME: %s\n", name);
+    //fflush( stdout );
+    int fd = open(name, O_RDWR | O_CREAT, 0777);
+	if (fd == -1) {
+		printf("Error Number % d\n", errno);  
+        perror("file open");
+		exit(-1);		
+	}
+
     int size = 10;
     if ( read( csock, &size, sizeof(size)) <= 0 )
     {
         printf( "The server has gone when should pass size of item\n" );
+        write(fd, REJECT, strlen(REJECT));
+        close(fd);
         close(csock);
         exit(-1);
     } 
     size = ntohl(size);
     printf("SIZE %d\n", size);
     fflush( stdout );
+
+    int fd_dev = open("/dev/null", O_RDWR, 0777);
+    if (fd_dev == -1) {
+        printf("Error Number % d\n", errno);  
+        perror("dev/null");
+		exit(-1);
+    }
+    
     char *buf = malloc((size + 1)*sizeof(char));
 
     int load = 1;
     int cursor = 0;
     while (load!=0) {
-        if (cursor >= size) break;
-        load = read(csock, (void *) (buf + cursor), size - cursor);
+        load = read(csock, (void *) buf, size - cursor);
+        if (load < 0) {
+            char err_str[strlen(BYTE_ERROR) + size/10*2 + 1];
+            sprintf(err_str, "%s %d", BYTE_ERROR, size);
+            write(fd, err_str, strlen(err_str));
+            close(fd);
+            break;
+        }
+        write(fd_dev, buf, strlen(buf));
         cursor+=load;
+        if (cursor >= size || load == 0) {
+            char print_str[strlen(SUCCESS) + size/10*2 + 1];
+            sprintf(print_str, "%s %d", SUCCESS, size); 
+            write(fd, print_str, strlen(print_str));
+            close(fd);
+            break;
+        }
     }
-
+    free(name);
+    close(fd_dev);
     /*if ( read( csock, buf, size) <= 0 )
     {
         printf( "The server has gone when should pass buffer of item.\n" );
@@ -96,19 +132,7 @@ void *consume(void *bundle) {
 
     //printf("Consuming: %s", buf);
     //fflush( stdout );
-    char* name = malloc(10*sizeof(char));
-    sprintf(name, "%d.txt", id);
-    //printf("NAME: %s\n", name);
-    //fflush( stdout );
-    int fd = open(name, O_RDWR | O_CREAT, 0777);
-	if (fd == -1) {
-		printf("Error Number % d\n", errno);  
-        perror(buf);
-		exit(-1);		
-	}
-    write(fd, buf, strlen(buf));
-    close(fd);
-    free(name);
+    close(csock);    
 	pthread_exit( NULL );
 }
 

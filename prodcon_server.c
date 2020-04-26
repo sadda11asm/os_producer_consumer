@@ -30,7 +30,7 @@ ITEM *makeItem(int size, int ssock){
 	int i;
 	ITEM *p = malloc( sizeof(ITEM) );
 	p->size = size;
-	p->prod_sd = ssock;	
+	p->psd = ssock;	
 	return p;
 }
 
@@ -116,21 +116,8 @@ void consume(int ssock) {
 
 	
 	int size = p.size;
-	int psock = p.prod_sd;
+	int psock = p.psd;
 
-	//reading from psock
-	char* buf = malloc((size + 1)*sizeof(char));
-
-    int load = 1;
-    int cursor = 0;
-
-    while (load!=0) {
-		if (cursor >= size) break;
-		load = read(psock, (void *) (buf + cursor), size - cursor);
-		cursor+=load;
-    }
-	buf[size] = '\0';
-	
 	int len = htonl(p.size);
 	char *data = (char*)&len;
 
@@ -139,16 +126,31 @@ void consume(int ssock) {
 		fprintf( stderr, "client write: %s\n", strerror(errno) );
 		exit( -1 );
 	}
+	//reading from psock
+	char* buf = malloc((size + 1)*sizeof(char));
+
+    int load = 1;
+    int cursor = 0;
+
+    while (load!=0) {
+		if (cursor >= size - 1) break;
+		load = read(psock, (void *) buf, size - cursor);
+		write( ssock, buf, load);
+		cursor+=load;
+		// printf("Load %d\n", load);
+    }
+	// buf[size] = '\0';
+	
 
 	//printf("Consuming buf %s\n", p.letters);
 	//fflush(stdout);
 	printf("Consuming size %d\n", p.size);
 	fflush(stdout);
-	if ( write( ssock, buf, p.size) < 0 ) {
-		/* This guy is dead */
-		close_socket( ssock, 0 );
-		exit(-1);
-	} 
+	// if ( write( ssock, buf, p.size) < 0 ) {
+	// 	/* This guy is dead */
+	// 	close_socket( ssock, 0 );
+	// 	exit(-1);
+	// } 
 	
     if ( write( psock, DONE, 6 ) < 0 ) {
             // This guy is dead

@@ -25,9 +25,8 @@ int 	bad = 0;
 char		*service;		
 char		*host = "localhost";
 
-char* getRandomString() {
-    int size = random()%MAX_LETTERS;
-	char* str = malloc(size);	
+char* getRandomString(int size) {
+    char* str = malloc(size);	
 	int i;
 	for ( i = 0; i < size-1; i++ )
 		str[i] = 'X';
@@ -42,6 +41,11 @@ double poissonRandomInterarrivalDelay( double r ) {
 
 void slow_down() {
 	sleep(SLOW_CLIENT);
+}
+
+int min(int a, int b) {
+	if (a < b) return a;
+	return b;
 }
 
 void *produce(void *is_b) {
@@ -75,26 +79,37 @@ void *produce(void *is_b) {
     }
 	buf[4]='\0';
     if (strcmp(buf, GO) == 0) {
-        char* item = getRandomString();
-        int len = htonl(strlen(item));
+		int size = random()%MAX_LETTERS;
+        int len = htonl(size);
         char *data = (char*)&len;
         if ( write(csock, data , sizeof(len)) < 0 ) {
             fprintf( stderr, "server write: %s\n", strerror(errno) );
             exit( -1 );
 	    }
 
-        if ( write(csock, item , strlen(item)) < 0 ) {
-            fprintf( stderr, "server write: %s\n", strerror(errno) );
-            exit( -1 );
-	    }
-	char done[7];
-	if ( read( csock, done, 6) <= 0 ) {
-		printf( "The server has gone.\n" );
-		close(csock);
-		exit(-1);
-	}
-	done[6] = '\0';
-	printf("Success!\n");
+		int cursor = 0;
+		int window = 100;
+		while (cursor < size) {
+			char* item = getRandomString(min(size-cursor, window));
+			int load;
+			if ( (load = write(csock, item , strlen(item))) < 0 ) {
+				fprintf( stderr, "server write: %s\n", strerror(errno) );
+				exit( -1 );
+			}
+			cursor+=load;
+			if (load == 0) {
+				break;
+			}	
+		}
+		printf("OUT OF WHILE\n");
+		char done[7];
+		if ( read( csock, done, 6) <= 0 ) {
+			printf( "The server has gone.\n" );
+			close(csock);
+			exit(-1);
+		}
+		done[6] = '\0';
+		printf("Success!\n");
         close( csock );
     } else {
         printf("Unexpected action: %s", buf);
