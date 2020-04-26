@@ -87,6 +87,20 @@ void *produce(void *is_b) {
             exit( -1 );
 	    }
 
+		if ( read( csock, buf, 4) <= 0 ) {
+			printf( "The server has gone.\n" );
+			close(csock);
+			exit(-1);
+		}
+		buf[4]='\0';
+		
+		if (strcmp(buf, GO) != 0) {
+			printf("Unexpected action: %s", buf);
+       		close(csock);
+			pthread_exit( NULL );;
+			exit(-1);
+		}
+
 		int cursor = 0;
 		int window = 100;
 		while (cursor < size) {

@@ -132,6 +132,13 @@ void consume(int ssock) {
     int load = 1;
     int cursor = 0;
 
+	if ( write( psock, GO, 4 ) < 0 ) {
+            /* This guy is dead */
+			printf( "The producer has gone when should get GO.\n" );
+            close_socket( ssock, 1 );
+            return;
+    }
+
     while (load!=0) {
 		if (cursor >= size - 1) break;
 		load = read(psock, (void *) buf, size - cursor);
