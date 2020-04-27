@@ -62,6 +62,7 @@ void *produce() {
         close(csock);
         exit(-1);
     }
+	buf[4]='\0';
     if (strcmp(buf, GO) == 0) {
         char* item = getRandomString();
         int len = htonl(strlen(item));

@@ -64,7 +64,7 @@ void produce(int ssock) {
 	// Wait for room in the buffer
 	// while ( count > BUFSIZE );
     
-    if ( write( ssock, GO, 5 ) < 0 ) {
+    if ( write( ssock, GO, 4 ) < 0 ) {
             /* This guy is dead */
 			printf( "The producer has gone when should get GO.\n" );
             close_socket( ssock, 1 );
@@ -113,7 +113,7 @@ void produce(int ssock) {
 
 	sem_post( &full );
 
-    if ( write( ssock, DONE, 7 ) < 0 ) {
+    if ( write( ssock, DONE, 6 ) < 0 ) {
             /* This guy is dead */
 			printf( "The producer has gone when should get DONE.\n" );
             close_socket( ssock, 1 );
