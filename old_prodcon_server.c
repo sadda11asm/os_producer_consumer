@@ -12,19 +12,17 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "prodcon.h"
-#include <sys/select.h>
 
-int CON_COUNT 	= 	0;
-int	PROD_COUNT	=	0;
-int	CONS_COUNT	=	0;
-char* PRODUCE = "PRODUCE\r\n";
-char* CRLF = "\r\n";
-char* GO = "GO\r\n";
-char* CONSUME = "CONSUME\r\n";
-char* DONE = "DONE\r\n";
-int ITEMSIZE = BUFSIZE;
-int nfds = 0;
-fd_set afds;
+
+int 	CON_COUNT 	= 	0;
+int		PROD_COUNT	=	0;
+int		CONS_COUNT	=	0;
+char*	PRODUCE = "PRODUCE\r\n";
+char* 	CRLF = "\r\n";
+char* 	GO = "GO\r\n";
+char* 	CONSUME = "CONSUME\r\n";
+char*	DONE = "DONE\r\n";
+int 	ITEMSIZE = BUFSIZE;
 
 int passivesock( char *service, char *protocol, int qlen, int *rport );
 
@@ -53,22 +51,20 @@ void close_socket(int ssock, int con_type) {
 	}
 	CON_COUNT--;
 	pthread_mutex_unlock( &mutex_conns );
+	if (con_type != 1) pthread_exit( NULL );
 }
 
-void *produce(void *ssck) {
-
-	int ssock = (int) ssck;
+void produce(int ssock) {
 
     int size = 10;
 
 	// Wait for room in the buffer
 	// while ( count > BUFSIZE );
     
-    if ( write( ssock, GO, 4 ) < 0 ) {
+    if ( write( ssock, GO, 5 ) < 0 ) {
             /* This guy is dead */
 			printf( "The producer has gone when should get GO.\n" );
             close_socket( ssock, 1 );
-			pthread_exit( 0 );
             return;
     } 
 
@@ -76,7 +72,6 @@ void *produce(void *ssck) {
     {
         printf( "The producer has gone when should pass size of item.\n" );
         close_socket(ssock, 1);
-		pthread_exit( 0 );
         return;
     } 
 	size = ntohl(size);
@@ -99,11 +94,11 @@ void *produce(void *ssck) {
 	sem_post( &full );
 
 	pthread_exit(0);
+	// Exit
+	// close_socket(ssock, 1);
 }
 
-void *consume(void *ssck) {
-	
-	int ssock = (int) ssck;
+void consume(int ssock) {
 
 	// Wait for items in the buffer
 	// while ( count <= 0 );
@@ -142,7 +137,6 @@ void *consume(void *ssck) {
 	//sending size to consumer
 	if ( write(ssock, data , sizeof(len)) < 0 ) {
 		fprintf( stderr, "client write: %s\n", strerror(errno) );
-		pthread_exit( 0 );
 		exit( -1 );
 	}
 
@@ -153,29 +147,26 @@ void *consume(void *ssck) {
 	if ( write( ssock, buf, p.size) < 0 ) {
 		/* This guy is dead */
 		close_socket( ssock, 0 );
-		pthread_exit( 0 );
 		exit(-1);
 	} 
 	
-    if ( write( psock, DONE, 6 ) < 0 ) {
+    if ( write( psock, DONE, 7 ) < 0 ) {
             // This guy is dead
 			printf( "The producer has gone when should get DONE.\n" );
             close_socket( psock, 1 );
-			pthread_exit( 0 );
             exit(-1);
     } 
 	
 	close_socket(psock, 1);
 	close_socket(ssock, 0);
-	pthread_exit( 0 );
-
 	// Exit
 }
 
 
-void handle( int ssock, pthread_t	thr ) {
+void *handle( void *s ) {
 	char buf[10];
 	int cc;
+	int ssock = (int) s;
 
 	/* start working for this guy */
 	/* ECHO what the client says */
@@ -183,60 +174,59 @@ void handle( int ssock, pthread_t	thr ) {
     if ( (cc = read( ssock, buf, 10)) <= 0 )
     {
         printf( "The client has gone.\n" );
-		close_socket(ssock, 10);
+        close_socket(ssock, 10);
         exit(-1);
     } 
 
     if (strcmp(buf, PRODUCE) == 0) {
 	
-		int ok = 1;
+	int ok = 1;
 	
     	pthread_mutex_lock( &mutex_conns );
 	
     	if (PROD_COUNT < MAX_PROD) {
-			PROD_COUNT++;
-		} else {
-			ok = 0;
-		}
-		pthread_mutex_unlock( &mutex_conns );
-		if (ok) {
-			printf("Producer is here!\n");
-			pthread_create( &thr, NULL, produce, (void *) ssock );
-		} else {
-			close_socket(ssock, 10);
-			printf("TOO MANY PRODUCERS! LIMIT IS REACHED!\n");
-		}
+		PROD_COUNT++;
+	} else {
+		ok = 0;
+		close_socket(ssock, 10);
+		printf("TOO MANY PRODUCERS! LIMIT IS REACHED!\n");
+	}
+	pthread_mutex_unlock( &mutex_conns );
+	if (ok) {
+		printf("Producer is here!\n");
+        	produce(ssock);
+	}	
 
     } else if (strcmp(buf, CONSUME) == 0) {
 
-		pthread_mutex_lock( &mutex_conns );
-		int ok = 1;
-		if (CONS_COUNT < MAX_CON) {
-			CONS_COUNT++;
-		} else {
-			ok = 0;
-		}
-		
-		pthread_mutex_unlock( &mutex_conns );
-		if (ok) {
-			printf("Consumer is here!\n");
-			pthread_create( &thr, NULL, consume, (void *) ssock );
-		} else {
-			close_socket(ssock, 10);
-			printf("TOO MANY CONSUMERS! LIMIT IS REACHED!\n");
-		}        
+	pthread_mutex_lock( &mutex_conns );
+	int ok = 1;
+	if (CONS_COUNT < MAX_CON) {
+		CONS_COUNT++;
+	} else {
+		ok = 0;
+		close_socket(ssock, 10);
+		printf("TOO MANY CONSUMERS! LIMIT IS REACHED!\n");
+	}
+	
+	pthread_mutex_unlock( &mutex_conns );
+	if (ok) {
+		consume(ssock);
+        	printf("Consumer is here!\n");	
+	}        
 	
     } else {
         printf("Unexpected action: %s\n", buf);
 		close_socket(ssock, 10);	
-        exit(-1);
     }
+	pthread_exit(0);
 }
 
 
 /*
 */
-int main( int argc, char *argv[] ) {
+int main( int argc, char *argv[] )
+{
 	char			*service;
 	struct sockaddr_in	fsin;
 	int			alen;
@@ -245,8 +235,6 @@ int main( int argc, char *argv[] ) {
 	int			rport = 0;
     pthread_mutex_init( &mutex, NULL );
     pthread_mutex_init( &mutex_conns, NULL);
-	// pthread_mutex_init( &mutex_select, NULL);
-
 
     count = 0;
 
@@ -283,87 +271,34 @@ int main( int argc, char *argv[] ) {
 		fflush( stdout );
 	}
 
-	nfds = msock+1;
-	FD_ZERO(&afds);
-	FD_SET( msock, &afds );
-
 	
 	for (;;)
 	{
 		int	ssock;
 		pthread_t	thr;
 
-		fd_set rfds;
-		memcpy((char *)&rfds, (char *)&afds, sizeof(rfds));
-
-		// pthread_mutex_lock( &mutex_select );
-
-		if (select(nfds, &rfds, (fd_set *)0, (fd_set *)0,
-				(struct timeval *)0) < 0)
+		alen = sizeof(fsin);
+		ssock = accept( msock, (struct sockaddr *)&fsin, &alen );
+		if (ssock < 0)
 		{
-			fprintf( stderr, "server select: %s\n", strerror(errno) );
-			exit(-1);
-		}
-		// pthread_mutex_unlock( &mutex_select );
-
-		if (FD_ISSET( msock, &rfds)) {
-			
-			int	ssock;
-
-			alen = sizeof(fsin);
-			ssock = accept( msock, (struct sockaddr *)&fsin, &alen );
-			if (ssock < 0)
-			{
-				fprintf( stderr, "accept: %s\n", strerror(errno) );
-				exit(-1);
-			}
-
-			// If a new client arrives, we must add it to our afds set
-			FD_SET( ssock, &afds );
-
-			// and increase the maximum, if necessary
-			if ( ssock+1 > nfds )
-				nfds = ssock+1;
-		} 
-
-
-		for (int fd = 0; fd < nfds; fd++ )
-		{
-			// check every socket to see if it's in the ready set
-			// But don't recheck the main socket
-			if (fd != msock && FD_ISSET(fd, &rfds))
-			{
-
-				int ok = 0;
-				FD_CLR( fd, &afds );
-				if ( nfds == fd+1 )
-					nfds--;
-				
-				pthread_mutex_lock( &mutex_conns );
-				if (CON_COUNT < MAX_CLIENTS) {
-				
-					printf( "A client has arrived.\n" );
-					fflush( stdout );
-					CON_COUNT++;
-					ok = 1;
-					// pthread_create( &thr, NULL, handle, (void *) ssock );
-				
-					// you can read without blocking because data is there
-					// the OS has confirmed this					
-				} 
-				pthread_mutex_unlock( &mutex_conns );
-
-				if (ok == 1) {
-					handle(fd, thr);
-				} else {
-					(void) close(fd);		
-					printf("TOO MANY CONNECTIONS! LIMIT IS REACHED!");		
-					fflush( stdout );	
-				}
-			}
-
+			fprintf( stderr, "accept: %s\n", strerror(errno) );
+			break;
 		}
 		
+		pthread_mutex_lock( &mutex_conns );
+		
+		if (CON_COUNT < MAX_CLIENTS) {
+		
+			printf( "A client has arrived.\n" );
+			fflush( stdout );
+			CON_COUNT++;
+			pthread_create( &thr, NULL, handle, (void *) ssock );
+		} else {
+			close(ssock);
+			printf("TOO MUCH CONNECTIONS! LIMIT IS REACHED!");			
+		}
+		pthread_mutex_unlock( &mutex_conns );
 	}
 	pthread_exit(0);
 }
+
