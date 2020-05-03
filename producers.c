@@ -80,6 +80,7 @@ void *produce(void *is_b) {
 	buf[4]='\0';
     if (strcmp(buf, GO) == 0) {
 		int size = random()%MAX_LETTERS;
+		// printf("MAX_LETTERS %d\n", MAX_LETTERS);
         int len = htonl(size);
         char *data = (char*)&len;
         if ( write(csock, data , sizeof(len)) < 0 ) {
@@ -102,7 +103,7 @@ void *produce(void *is_b) {
 		}
 
 		int cursor = 0;
-		int window = 100;
+		int window = BUFSIZE;
 		while (cursor < size) {
 			char* item = getRandomString(min(size-cursor, window));
 			int load;
@@ -115,7 +116,7 @@ void *produce(void *is_b) {
 				break;
 			}	
 		}
-		printf("OUT OF WHILE\n");
+		// printf("OUT OF WHILE\n");
 		char done[7];
 		if ( read( csock, done, 6) <= 0 ) {
 			printf( "The server has gone.\n" );

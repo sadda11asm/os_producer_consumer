@@ -43,6 +43,11 @@ pthread_mutex_t mutex;
 pthread_mutex_t mutex_conns;
 sem_t full, empty;
 
+int min(int a, int b) {
+	if (a < b) return a;
+	return b;
+}
+
 void close_socket(int ssock, int con_type) {
 	close(ssock);	
 	pthread_mutex_lock( &mutex_conns );	
@@ -135,7 +140,6 @@ void *consume(void *ssck) {
 		exit( -1 );
 	}
 	//reading from psock
-	char* buf = malloc((size + 1)*sizeof(char));
 
     int load = 1;
     int cursor = 0;
@@ -150,12 +154,14 @@ void *consume(void *ssck) {
     }
 
     while (load!=0) {
+		char* buf = malloc(BUFSIZE*sizeof(char));
 		if (cursor >= size - 1) break;
-		load = read(psock, (void *) buf, size - cursor);
+		load = read(psock, (void *) buf, min(BUFSIZE, size - cursor));
 		write( ssock, buf, load);
 		cursor+=load;
 		// printf("Load %d\n", load);
     }
+	// printf("OUT OF WHILE\n");
 	// buf[size] = '\0';
 	
 
@@ -282,6 +288,7 @@ int main( int argc, char *argv[] ) {
 			exit(-1);
 	}
 
+	// printf("MAX_LETTERS %d\n", MAX_LETTERS);
 	sem_init( &full, 0, 0 );
 	sem_init( &empty, 0, ITEMSIZE );
 

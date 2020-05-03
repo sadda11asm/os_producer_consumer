@@ -24,6 +24,11 @@ char		*host = "localhost";
 double      rate = 0;
 int         bad = 0;
 
+int min(int a, int b) {
+	if (a < b) return a;
+	return b;
+}
+
 double poissonRandomInterarrivalDelay( double r )
 {
     return (log((double) 1.0 - 
@@ -43,8 +48,10 @@ struct args {
 
 void *consume(void *bundle) {
     
-    int id = ((struct args*)bundle)->tid;
+    int tid = ((struct args*)bundle)->tid;
     int is_bad = ((struct args*)bundle)->is_bad;
+
+    pid_t id = pthread_self();
 
     if (is_bad == 1) {
         slow_down();
@@ -98,12 +105,13 @@ void *consume(void *bundle) {
 		exit(-1);
     }
     
-    char *buf = malloc((size + 1)*sizeof(char));
+   
 
     int load = 1;
     int cursor = 0;
     while (load!=0) {
-        load = read(csock, (void *) buf, size - cursor);
+        char *buf = malloc(BUFSIZE*sizeof(char));
+        load = read(csock, (void *) buf, min(size - cursor, BUFSIZE));
         if (load < 0) {
             char err_str[strlen(BYTE_ERROR) + size/10*2 + 1];
             sprintf(err_str, "%s %d", BYTE_ERROR, size);
@@ -113,6 +121,7 @@ void *consume(void *bundle) {
         }
         write(fd_dev, buf, strlen(buf));
         cursor+=load;
+        // printf("cursor %d\n", cursor);
         if (cursor >= size || load == 0) {
             char print_str[strlen(SUCCESS) + size/10*2 + 1];
             sprintf(print_str, "%s %d", SUCCESS, size); 
@@ -121,6 +130,7 @@ void *consume(void *bundle) {
             break;
         }
     }
+    // printf("OUT OF WHILE\n");
     free(name);
     close(fd_dev);
     /*if ( read( csock, buf, size) <= 0 )
