@@ -28,9 +28,8 @@ char		*host = "localhost";
 char* getRandomString(int size) {
     char* str = malloc(size);	
 	int i;
-	for ( i = 0; i < size-1; i++ )
+	for ( i = 0; i < size; i++ )
 		str[i] = 'X';
-	str[i] = '\0';
     return str;
 }
 
@@ -61,7 +60,7 @@ void *produce(void *is_b) {
 	if ( ( csock = connectsock( host, service, "tcp" )) == 0 )
 	{
 		fprintf( stderr, "Cannot connect to server.\n" );
-		exit( -1 );
+		pthread_exit(NULL);
 	}
 
 	printf( "The server is ready for producer!\n" );
@@ -69,13 +68,14 @@ void *produce(void *is_b) {
 
     if ( write(csock, PRODUCE , 9) < 0 ) {
         fprintf( stderr, "Producer write: %s\n", strerror(errno) );
-        exit( -1 );
+		close(csock);
+        pthread_exit(NULL);
 	}
     char buf[5];
     if ( read( csock, buf, 4) <= 0 ) {
         printf( "The server has gone.\n" );
         close(csock);
-        exit(-1);
+      	pthread_exit(NULL);
     }
 	buf[4]='\0';
     if (strcmp(buf, GO) == 0) {
@@ -85,13 +85,14 @@ void *produce(void *is_b) {
         char *data = (char*)&len;
         if ( write(csock, data , sizeof(len)) < 0 ) {
             fprintf( stderr, "server write: %s\n", strerror(errno) );
-            exit( -1 );
+            close(csock);
+      		pthread_exit(NULL);
 	    }
 
 		if ( read( csock, buf, 4) <= 0 ) {
 			printf( "The server has gone.\n" );
 			close(csock);
-			exit(-1);
+      		pthread_exit(NULL);
 		}
 		buf[4]='\0';
 		
@@ -99,7 +100,6 @@ void *produce(void *is_b) {
 			printf("Unexpected action: %s", buf);
        		close(csock);
 			pthread_exit( NULL );;
-			exit(-1);
 		}
 
 		int cursor = 0;
@@ -112,6 +112,7 @@ void *produce(void *is_b) {
 				exit( -1 );
 			}
 			cursor+=load;
+			free(item);
 			if (load == 0) {
 				break;
 			}	
@@ -121,7 +122,7 @@ void *produce(void *is_b) {
 		if ( read( csock, done, 6) <= 0 ) {
 			printf( "The server has gone.\n" );
 			close(csock);
-			exit(-1);
+      		pthread_exit(NULL);
 		}
 		done[6] = '\0';
 		printf("Success!\n");

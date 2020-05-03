@@ -73,16 +73,14 @@ void *produce(void *ssck) {
             /* This guy is dead */
 			printf( "The producer has gone when should get GO.\n" );
             close_socket( ssock, 1 );
-			pthread_exit( 0 );
-            return;
+			pthread_exit(NULL);
     } 
 
     if ( read( ssock, &size, sizeof(size)) <= 0 )
     {
         printf( "The producer has gone when should pass size of item.\n" );
         close_socket(ssock, 1);
-		pthread_exit( 0 );
-        return;
+		pthread_exit(NULL);
     } 
 	size = ntohl(size);
     
@@ -103,7 +101,7 @@ void *produce(void *ssck) {
 
 	sem_post( &full );
 
-	pthread_exit(0);
+	pthread_exit(NULL);
 }
 
 void *consume(void *ssck) {
@@ -136,8 +134,7 @@ void *consume(void *ssck) {
 		fprintf( stderr, "client write: %s\n", strerror(errno) );
         close_socket( psock, 1 );
         close_socket( ssock, 0);
-        pthread_exit(0);
-		exit( -1 );
+        pthread_exit(NULL);
 	}
 	//reading from psock
 
@@ -149,16 +146,17 @@ void *consume(void *ssck) {
 			printf( "The producer has gone when should get GO.\n" );
             close_socket( psock, 1 );
             close_socket( ssock, 0);
-            pthread_exit(0);
-            return;
+            pthread_exit(NULL);
     }
 
     while (load!=0) {
 		char* buf = malloc(BUFSIZE*sizeof(char));
 		if (cursor >= size - 1) break;
 		load = read(psock, (void *) buf, min(BUFSIZE, size - cursor));
-		write( ssock, buf, load);
 		cursor+=load;
+		// buf[load] = 'X';
+		write( ssock, buf, load);
+		free(buf);
 		// printf("Load %d\n", load);
     }
 	// printf("OUT OF WHILE\n");
@@ -180,13 +178,12 @@ void *consume(void *ssck) {
 			printf( "The producer has gone when should get DONE.\n" );
             close_socket( psock, 1 );
             close_socket(ssock, 0);
-            pthread_exit(0);
-            exit(-1);
+            pthread_exit(NULL);
     } 
 	
 	close_socket(psock, 1);
 	close_socket(ssock, 0);
-    pthread_exit(0);
+    pthread_exit(NULL);
 	// Exit
 }
 

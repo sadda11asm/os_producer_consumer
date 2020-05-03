@@ -62,7 +62,7 @@ void *consume(void *bundle) {
 	if ( ( csock = connectsock( host, service, "tcp" )) == 0 )
 	{
 		fprintf( stderr, "Cannot connect to server.\n" );
-		exit( -1 );
+      	pthread_exit(NULL);
 	}
 
 	printf( "The server is ready for consumer!\n" );
@@ -71,7 +71,8 @@ void *consume(void *bundle) {
     if ( write(csock, CONSUME , 9) < 0 ) {
         printf( "The server has gone when getting CONSUME\n" );
         fprintf( stderr, "Consumer write: %s\n", strerror(errno) );
-        exit( -1 );
+        close(csock);
+      	pthread_exit(NULL);
 	}
 
     char* name = malloc(10*sizeof(char));
@@ -82,18 +83,19 @@ void *consume(void *bundle) {
 	if (fd == -1) {
 		printf("Error Number % d\n", errno);  
         perror("file open");
-		exit(-1);		
+		close(csock);
+      	pthread_exit(NULL);	
 	}
 
-    int size = 10;
+    int size = 1000000;
     if ( read( csock, &size, sizeof(size)) <= 0 )
     {
         printf( "The server has gone when should pass size of item\n" );
         write(fd, REJECT, strlen(REJECT));
         close(fd);
         close(csock);
-        exit(-1);
-    } 
+      	pthread_exit(NULL);
+    }
     size = ntohl(size);
     printf("SIZE %d\n", size);
     fflush( stdout );
@@ -102,18 +104,21 @@ void *consume(void *bundle) {
     if (fd_dev == -1) {
         printf("Error Number % d\n", errno);  
         perror("dev/null");
-		exit(-1);
+		close(csock);
+      	pthread_exit(NULL);
     }
     
    
 
     int load = 1;
     int cursor = 0;
+    printf("IN WHILE\n");
     while (load!=0) {
-        char *buf = malloc(BUFSIZE*sizeof(char));
+        char *buf = malloc((BUFSIZE+1)*sizeof(char));
         load = read(csock, (void *) buf, min(size - cursor, BUFSIZE));
+        buf[load+1] = '\0';
         if (load < 0) {
-            char err_str[strlen(BYTE_ERROR) + size/10*2 + 1];
+            char err_str[strlen(BYTE_ERROR) + (int)log10(size) + 3];
             sprintf(err_str, "%s %d", BYTE_ERROR, size);
             write(fd, err_str, strlen(err_str));
             close(fd);
@@ -123,14 +128,15 @@ void *consume(void *bundle) {
         cursor+=load;
         // printf("cursor %d\n", cursor);
         if (cursor >= size || load == 0) {
-            char print_str[strlen(SUCCESS) + size/10*2 + 1];
+            char print_str[strlen(SUCCESS) + (int)log10(size) + 3];
             sprintf(print_str, "%s %d", SUCCESS, size); 
             write(fd, print_str, strlen(print_str));
             close(fd);
             break;
         }
+        free(buf);
     }
-    // printf("OUT OF WHILE\n");
+    printf("OUT OF WHILE\n");
     free(name);
     close(fd_dev);
     /*if ( read( csock, buf, size) <= 0 )
@@ -143,6 +149,7 @@ void *consume(void *bundle) {
     //printf("Consuming: %s", buf);
     //fflush( stdout );
     close(csock);    
+    printf("SUCCESS\n");
 	pthread_exit( NULL );
 }
 
