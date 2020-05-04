@@ -51,9 +51,6 @@ void *produce(void *is_b) {
 
 	int is_bad = (int) is_b;
 
-	if (is_bad == 1) {
-		slow_down();
-	}
 
 	int		csock;
 	/*	Create the socket to the controller  */
@@ -61,6 +58,10 @@ void *produce(void *is_b) {
 	{
 		fprintf( stderr, "Cannot connect to server.\n" );
 		pthread_exit(NULL);
+	}
+
+	if (is_bad == 1) {
+		slow_down();
 	}
 
 	printf( "The server is ready for producer!\n" );

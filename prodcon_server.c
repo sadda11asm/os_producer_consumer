@@ -25,6 +25,7 @@ char* DONE = "DONE\r\n";
 int ITEMSIZE = BUFSIZE;
 int nfds = 0;
 fd_set afds;
+int REJ_COUNT = 	0;
 
 int passivesock( char *service, char *protocol, int qlen, int *rport );
 
@@ -258,6 +259,7 @@ int main( int argc, char *argv[] ) {
 	int			msock;
 	int			ssock;
 	int			rport = 0;
+	long 		time_of_accept[1601];
     pthread_mutex_init( &mutex, NULL );
     pthread_mutex_init( &mutex_conns, NULL);
 	// pthread_mutex_init( &mutex_select, NULL);
@@ -306,16 +308,16 @@ int main( int argc, char *argv[] ) {
 	
 	for (;;)
 	{
-		int	ssock;
 		pthread_t	thr;
 
 		fd_set rfds;
 		memcpy((char *)&rfds, (char *)&afds, sizeof(rfds));
 
 		// pthread_mutex_lock( &mutex_select );
+		struct timeval tv={REJECT_TIME,0};
 
 		if (select(nfds, &rfds, (fd_set *)0, (fd_set *)0,
-				(struct timeval *)0) < 0)
+				&tv) < 0)
 		{
 			fprintf( stderr, "server select: %s\n", strerror(errno) );
 			exit(-1);
@@ -334,6 +336,11 @@ int main( int argc, char *argv[] ) {
 				exit(-1);
 			}
 
+			struct timeval tv;
+			gettimeofday(&tv, NULL); 
+			long curtime=tv.tv_sec*1000000 + tv.tv_usec;
+			time_of_accept[ssock] = curtime;
+
 			// If a new client arrives, we must add it to our afds set
 			FD_SET( ssock, &afds );
 
@@ -342,9 +349,30 @@ int main( int argc, char *argv[] ) {
 				nfds = ssock+1;
 		} 
 
+		if (select(nfds, &rfds, (fd_set *)0, (fd_set *)0,
+				&tv) < 0)
+		{
+			fprintf( stderr, "server select: %s\n", strerror(errno) );
+			exit(-1);
+		}
+
 
 		for (int fd = 0; fd < nfds; fd++ )
 		{
+			if (fd!=msock && FD_ISSET(fd, &afds) && !FD_ISSET(fd, &rfds)) {
+				struct timeval tv;
+				gettimeofday(&tv, NULL); 
+				long curtime=tv.tv_sec*1000000 + tv.tv_usec;
+				long prevtime=time_of_accept[fd];
+				if (curtime - prevtime > REJECT_TIME*1000000) {
+					close(fd);
+					FD_CLR( fd, &afds );
+					if ( nfds == fd+1 )
+						nfds--;
+					REJ_COUNT++;
+					continue;
+				}
+			}
 			// check every socket to see if it's in the ready set
 			// But don't recheck the main socket
 			if (fd != msock && FD_ISSET(fd, &rfds))
