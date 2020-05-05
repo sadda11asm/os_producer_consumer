@@ -53,10 +53,6 @@ void *consume(void *bundle) {
 
     pid_t id = pthread_self();
 
-    if (is_bad == 1) {
-        slow_down();
-    }
-
 	int	csock;
 	/*	Create the socket to the controller  */
 	if ( ( csock = connectsock( host, service, "tcp" )) == 0 )
@@ -64,6 +60,10 @@ void *consume(void *bundle) {
 		fprintf( stderr, "Cannot connect to server.\n" );
       	pthread_exit(NULL);
 	}
+
+    if (is_bad == 1) {
+        slow_down();
+    }
 
 	printf( "The server is ready for consumer!\n" );
 	fflush( stdout );
