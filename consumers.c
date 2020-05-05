@@ -51,7 +51,7 @@ void *consume(void *bundle) {
     int tid = ((struct args*)bundle)->tid;
     int is_bad = ((struct args*)bundle)->is_bad;
 
-    pid_t id = pthread_self();
+    long id = pthread_self();
 
 
 	int	csock;
@@ -77,7 +77,7 @@ void *consume(void *bundle) {
 	}
 
     char* name = malloc(10*sizeof(char));
-    sprintf(name, "%d.txt", id);
+    sprintf(name, "%ld.txt", id);
     //printf("NAME: %s\n", name);
     //fflush( stdout );
     int fd = open(name, O_RDWR | O_CREAT, 0777);

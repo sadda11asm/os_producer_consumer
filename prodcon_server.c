@@ -25,7 +25,12 @@ char* DONE = "DONE\r\n";
 int ITEMSIZE = BUFSIZE;
 int nfds = 0;
 fd_set afds;
-int REJ_COUNT = 	0;
+int REJ_SLOW_COUNT = 	0;
+int PROD_SERVED = 	0;
+int CONS_SERVED = 	0;
+int REJ_MAX_COUNT = 0;
+int CONS_MAX_REJ =	0;
+int PROD_MAX_REJ =	0;
 
 int passivesock( char *service, char *protocol, int qlen, int *rport );
 
@@ -42,6 +47,7 @@ ITEM **buffer;
 
 pthread_mutex_t mutex;
 pthread_mutex_t mutex_conns;
+
 sem_t full, empty;
 
 int min(int a, int b) {
@@ -73,6 +79,7 @@ void *produce(void *ssck) {
     if ( write( ssock, GO, 4 ) < 0 ) {
             /* This guy is dead */
 			printf( "The producer has gone when should get GO.\n" );
+			fflush( stdout );
             close_socket( ssock, 1 );
 			pthread_exit(NULL);
     } 
@@ -80,6 +87,7 @@ void *produce(void *ssck) {
     if ( read( ssock, &size, sizeof(size)) <= 0 )
     {
         printf( "The producer has gone when should pass size of item.\n" );
+		fflush( stdout );
         close_socket(ssock, 1);
 		pthread_exit(NULL);
     } 
@@ -97,6 +105,7 @@ void *produce(void *ssck) {
 	// Put the item in the next slot in the buffer
 	buffer[count] = p;
 	count++;
+	PROD_SERVED++;
 	printf( "C Count %d.\n", count );
 	pthread_mutex_unlock( &mutex );
 
@@ -118,6 +127,7 @@ void *consume(void *ssck) {
 	p = *(buffer[count-1]);
 	buffer[count-1] = NULL;
 	count--;
+	CONS_SERVED++;
 	printf( "C Count %d.\n", count );
 	pthread_mutex_unlock( &mutex );
 
@@ -188,6 +198,57 @@ void *consume(void *ssck) {
 	// Exit
 }
 
+void handle_status(int ssock, char buf[]) {
+	int ans = 1;
+	int sz = 0;
+	for (int i = 1; i < strlen(buf); i++) {
+		if (buf[i] == '/' || buf[i] == '\\') {
+			sz = i;
+			break;
+		}
+	}
+	char action[sz];
+	for (int i = 1; i < sz; i++) {
+		action[i-1] = buf[i];
+	}
+	action[sz-1] = '\0';
+	// printf("%s\n", action);
+	if (strcmp(action, "CURRCLI") == 0) {
+		ans = CON_COUNT - 1;
+	} 
+	if (strcmp(action, "CURRPROD") == 0) {
+		ans = PROD_COUNT;
+	}
+	if (strcmp(action, "CURRCONS") == 0 ) {
+		ans = CONS_COUNT;
+	} 
+	if (strcmp(action, "TOTPROD") == 0 ) {
+		ans = PROD_SERVED;
+	} 
+	if (strcmp(action, "TOTCONS") == 0 ) {
+		ans = CONS_SERVED;
+	} 
+	if (strcmp(action, "REJMAX") == 0 ) {
+		ans = REJ_MAX_COUNT;
+	} 
+	if (strcmp(action, "REJSLOW") == 0 ) {
+		ans = REJ_SLOW_COUNT;
+	} 
+	if (strcmp(action, "REJPROD") == 0 ) {
+		ans = PROD_MAX_REJ;
+	} 
+	if (strcmp(action, "REJCONS") == 0 ) {
+		ans = CONS_MAX_REJ;
+	} 
+	// printf("%s\n", action);
+	if (ans == 0) sz = 1;
+	else sz = (int)log10(ans) + 3;
+	char res[sz];
+	sprintf(res, "%d", ans);
+	write(ssock, res, strlen(res));
+	return;
+}
+
 
 void handle( int ssock, pthread_t	thr ) {
 	char buf[10];
@@ -196,12 +257,26 @@ void handle( int ssock, pthread_t	thr ) {
 	/* start working for this guy */
 	/* ECHO what the client says */
 
+	char status[7];
+
+
     if ( (cc = read( ssock, buf, 10)) <= 0 )
     {
         printf( "The client has gone.\n" );
+		fflush( stdout );
 		close_socket(ssock, 10);
         exit(-1);
     } 
+	// memcpy( status, &buf, 6);
+	// printf("%s\n", buf);
+	for (int i = 0; i < 6; i++) 
+		status[i] = buf[i];
+	status[6] = '\0';
+	char rest[25];
+	for (int i = 6; i < 10; i++)
+		rest[i-6] = buf[i];
+	// printf("%s\n", buf);
+
 
     if (strcmp(buf, PRODUCE) == 0) {
 	
@@ -217,10 +292,13 @@ void handle( int ssock, pthread_t	thr ) {
 		pthread_mutex_unlock( &mutex_conns );
 		if (ok) {
 			printf("Producer is here!\n");
+			fflush( stdout );
 			pthread_create( &thr, NULL, produce, (void *) ssock );
 		} else {
 			close_socket(ssock, 10);
 			printf("TOO MANY PRODUCERS! LIMIT IS REACHED!\n");
+			fflush( stdout );
+			PROD_MAX_REJ++;
 		}
 
     } else if (strcmp(buf, CONSUME) == 0) {
@@ -236,14 +314,23 @@ void handle( int ssock, pthread_t	thr ) {
 		pthread_mutex_unlock( &mutex_conns );
 		if (ok) {
 			printf("Consumer is here!\n");
+			fflush( stdout );
 			pthread_create( &thr, NULL, consume, (void *) ssock );
 		} else {
 			close_socket(ssock, 10);
 			printf("TOO MANY CONSUMERS! LIMIT IS REACHED!\n");
+			fflush( stdout );
+			CONS_MAX_REJ++;
 		}        
 	
-    } else {
-        printf("Unexpected action: %s\n", buf);
+    } else if (strcmp(status, "STATUS") == 0) {
+		read(ssock, rest+4, 15);
+		// write(ssock, "10", 2);
+		// printf("%s\n", rest);
+		handle_status(ssock, rest);
+		close_socket(ssock, 10);
+	} else {
+        printf("Unexpected action: %s\n", status);
 		close_socket(ssock, 10);	
         exit(-1);
     }
@@ -369,7 +456,7 @@ int main( int argc, char *argv[] ) {
 					FD_CLR( fd, &afds );
 					if ( nfds == fd+1 )
 						nfds--;
-					REJ_COUNT++;
+					REJ_SLOW_COUNT++;
 					continue;
 				}
 			}
@@ -401,7 +488,8 @@ int main( int argc, char *argv[] ) {
 					handle(fd, thr);
 				} else {
 					(void) close(fd);		
-					printf("TOO MANY CONNECTIONS! LIMIT IS REACHED!");		
+					printf("TOO MANY CONNECTIONS! LIMIT IS REACHED!");	
+					REJ_MAX_COUNT++;	
 					fflush( stdout );	
 				}
 			}
