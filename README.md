@@ -1,4 +1,4 @@
-# os_producer_consumer
+# Operating Systems Project
 ## Producer-Consumer multiplexing server written in C using semaphores, mutex, threads, sockets, POSIX etc.
 
 ### Two main clients: 
